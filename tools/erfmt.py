@@ -1,5 +1,8 @@
 """Readers for the FromSoftware container formats the extractor needs:
-DCX (Oodle Kraken, via the game's own oo2core DLL) and BND4."""
+DCX (Oodle Kraken, via the game's own oo2core DLL) and BND4.
+
+On Linux the DLL is loaded natively through liblinoodle.so when it is
+available (see README); otherwise through Wine."""
 import ctypes
 import struct
 from pathlib import Path
@@ -138,11 +141,39 @@ def _get_server():
     return _server_proc
 
 
+def linoodle_path():
+    """liblinoodle.so, which loads the game's Windows DLL natively on Linux: $LINOODLE, else tools/lib/."""
+    path = Path(os.environ.get("LINOODLE", Path(__file__).parent / "lib" / "liblinoodle.so"))
+    return path if sys.platform.startswith("linux") and path.exists() else None
+
+
+def _load_linoodle(lib_path):
+    # linoodle loads "oo2core_8_win64.dll" from the working directory when it is
+    # loaded, so give it a directory where that name points at the game's DLL.
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        os.symlink(paths.game_dir() / "oo2core_6_win64.dll", Path(tmp) / "oo2core_8_win64.dll")
+        cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            return ctypes.CDLL(str(Path(lib_path).resolve()))
+        finally:
+            os.chdir(cwd)
+
+
 def _oodle_decompress(data: bytes, raw_size: int) -> bytes:
     global _oodle
+    if _oodle is None and linoodle_path():
+        _oodle = _load_linoodle(linoodle_path())
+        _oodle.OodleLZ_Decompress.restype = ctypes.c_int64
+        _oodle.OodleLZ_Decompress.argtypes = [
+            ctypes.c_char_p, ctypes.c_int64, ctypes.c_char_p, ctypes.c_int64,
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_int64,
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int64, ctypes.c_int,
+        ]
     # This is to allow our script here to work for mac/linux
     # Does require that the invoker has wine installed
-    if sys.platform != "win32" and sys.platform != "win64":
+    if _oodle is None and sys.platform != "win32" and sys.platform != "win64":
         srv = _get_server()
         srv.stdin.write(struct.pack(">QI", raw_size, len(data)) + data)
         srv.stdin.flush()

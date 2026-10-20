@@ -1,5 +1,12 @@
 # Elden Ring player movement and combat, in Bevy
 
+> [!NOTE]
+> **This is a fork** of [Funny-Bones/ELDEN-RING-Combat-Rewrite](https://github.com/Funny-Bones/ELDEN-RING-Combat-Rewrite).
+> The sandbox and its tools are the original authors' work. This fork only adds a
+> native Linux route for unpacking the game files, with no Wine, UXM or WitchyBND:
+> see [On Linux, natively](#on-linux-natively-no-wine-no-uxm-or-witchybnd). Everything
+> else is unchanged from upstream.
+
 A sandbox that recreates how the player character moves and fights in
 ELDEN RING, written in Rust on [Bevy](https://bevyengine.org) 0.19.
 
@@ -190,6 +197,26 @@ You simply need Rust, and Python 3.10 or newer.
 You need Rust, Python 3.10 or newer and Wine.
 
 Wine is used to interface with the Windows specific dlls provided by your copy of the game.
+
+### On Linux, natively (no Wine, no UXM or WitchyBND)
+You need Rust, Python 3.10 or newer, `openssl`, and `liblinoodle.so`, built from
+[linoodle](https://github.com/McSimp/linoodle). It loads the game's Oodle DLL
+natively. Put it at `tools/lib/liblinoodle.so`, or point `LINOODLE` at it.
+On Python older than 3.14, `regulation.bin` also needs the `zstandard` module or
+the `zstd` command.
+
+Step 1 below is then a single command, which reads the archives straight from
+the game folder and writes `chr/`, `regulation-bin/` and `sd/` into `ER_FILES`.
+The decryption keys come from your own `eldenring.exe` too, so nothing from the
+game is in this repository:
+
+```bash
+export ER_GAME_DIR="$HOME/.local/share/Steam/steamapps/common/ELDEN RING/Game"
+python tools/unpack.py        # --no-sound to leave the sound out
+```
+
+Then carry on from step 3. Check it with
+`python -m unittest discover -s tools/tests`.
 ____
 
 Generated files are deliberately not in the repository, because they are
@@ -199,7 +226,8 @@ animations (`assets/player_anims.bin`) and the sounds
 or run until you generate the first two from your own game files. That is one
 command once the files are unpacked.
 
-1. **Unpack the game files.** The archives are encrypted, so this step uses
+1. **Unpack the game files.** On Linux, `python tools/unpack.py` does this step
+   (see above). Otherwise the archives are encrypted, so this step uses
    community tools:
    - With UXM Selective Unpack, unpack only these from `chr/`:
      `c0000.anibnd.dcx`, `c0000_a00_hi`, `c0000_a00_lo`, `c0000_a00_md`,
@@ -235,7 +263,8 @@ command once the files are unpacked.
    > [!NOTE]
    > **Linux & macOS users:** Because the game's Oodle decompression library
    > (`oo2core_6_win64.dll`) is a 64-bit Windows PE binary, the extraction tools
-   > communicate with it using Wine. Ensure `wine` is installed. The script will
+   > communicate with it using Wine, unless `liblinoodle.so` is found on Linux
+   > (see above). Otherwise ensure `wine` is installed. The script will
    > automatically look for Windows Python under Wine, or you can point `WINE_PYTHON`
    > directly to your `python.exe` binary.
 

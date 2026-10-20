@@ -8,3 +8,5 @@ __pycache__/
 /src/sim/extracted.rs
 # Default location for unpacked game files (see README).
 /er-files/
+# Locally built native Oodle loader (see README).
+/tools/lib/
